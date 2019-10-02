@@ -1,14 +1,15 @@
 import { app, BrowserWindow, shell, ipcMain } from 'electron';
 import url from 'url';
 import path from 'path';
+import fs from 'fs';
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
-let win;
+let mainWindow;
 
 const createWindow = () => {
-  // Tạo một cửa sổ trình duyệt.
-  win = new BrowserWindow({
+  // Create a main browser window
+  mainWindow = new BrowserWindow({
     width: 1366,
     height: 768,
     webPreferences: {
@@ -17,11 +18,8 @@ const createWindow = () => {
   });
 
   // and load the index.html of the app.
-  const indexPath = path.resolve(
-    `${__dirname}`,
-    'electron/resources/index.html',
-  );
-  win.loadURL(
+  const indexPath = path.resolve(__dirname, 'electron/resources/index.html');
+  mainWindow.loadURL(
     url.format({
       pathname: indexPath,
       protocol: 'file:',
@@ -30,21 +28,17 @@ const createWindow = () => {
   );
 
   // Open the DevTools.
-  // win.webContents.openDevTools();
-
-  ipcMain.on('open-link', (evt, link) => {
-    shell.openExternal(link);
-  });
+  // mainWindow.webContents.openDevTools();
 
   // Bắt sự kiện cửa sổ được đóng lại.
-  win.on('closed', () => {
+  mainWindow.on('closed', () => {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
-    win = null;
+    mainWindow = null;
   });
 
-  win.webContents.session.webRequest.onBeforeRequest(
+  mainWindow.webContents.session.webRequest.onBeforeRequest(
     { urls: ['devtools://devtools/remote/*'] },
     (details, callback) => {
       callback({
@@ -55,6 +49,43 @@ const createWindow = () => {
       });
     },
   );
+
+  mainWindow.webContents.on(
+    'new-window',
+    (event, url, frameName, disposition, options, additionalFeatures) => {
+      event.preventDefault();
+      let win = new BrowserWindow({
+        width: 800,
+        height: 600,
+        webPreferences: {
+          nodeIntegration: true,
+        },
+      });
+      win.webContents.on('did-finish-load', evt => {
+        fs.readFile(path.join(__dirname, 'renderer.js'), (err, content) => {
+          if (content) {
+            win.webContents.executeJavaScript(content.toString());
+          }
+        });
+      });
+      win.on('close', () => {
+        win = null;
+      });
+      win.loadURL(url);
+      event.newGuest = win;
+    },
+  );
+
+  ipcMain.on('open-link', (evt, link) => {
+    shell.openExternal(link);
+  });
+
+  ipcMain.on('message', (evt, message) => {
+    mainWindow.webContents.executeJavaScript(
+      `console.log("External link send you a message: ${message}")`,
+    );
+    evt.reply('reply', 'Nice to meet you, external link!');
+  });
 };
 
 // Phương thức này sẽ được gọi ra khi Electron hoàn thành
