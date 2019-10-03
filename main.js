@@ -71,6 +71,7 @@ const createWindow = () => {
       win.on('close', () => {
         win = null;
       });
+      // win.loadURL('https://maxbet.pigfarm.io/');
       win.loadURL(url);
       event.newGuest = win;
     },
