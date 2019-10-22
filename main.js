@@ -54,26 +54,52 @@ const createWindow = () => {
     'new-window',
     (event, url, frameName, disposition, options, additionalFeatures) => {
       event.preventDefault();
+      const paramsPart = url
+        .slice(url.indexOf('?') + 1)
+        .split('&')
+        .map(paramStr => paramStr.split('='));
+      let currentSession = (paramsPart.find(param => param[0] === 'session') ||
+        [])[1];
+      currentSession = JSON.parse(decodeURI(currentSession));
+
       let win = new BrowserWindow({
         width: 800,
         height: 600,
         webPreferences: {
           nodeIntegration: true,
+          preload: path.join(__dirname, 'preload.js'),
         },
       });
       win.webContents.on('did-finish-load', evt => {
         fs.readFile(path.join(__dirname, 'renderer.js'), (err, content) => {
           if (content) {
-            win.webContents.executeJavaScript(content.toString());
+            //   win.webContents.session.clearCache().then(() => {
+            //     win.webContents.executeJavaScript(content.toString());
+            //     win.webContents.executeJavaScript(
+            //       `sessionStorage.setItem('privateKey', '${currentSession.privateKey}');`,
+            //     );
+            //     console.warn('webContents -- ', win.webContents);
+            //   });
           }
         });
       });
       win.on('close', () => {
         win = null;
       });
-      // win.loadURL('https://maxbet.pigfarm.io/');
-      win.loadURL(url);
+      win.loadURL('https://maxbet.pigfarm.io');
+      win.privateKey = currentSession.privateKey;
+      // win.loadURL(url);
       event.newGuest = win;
+
+      // ipcMain.on('load-session', evt => {
+      //   win.webContents.session.clearCache().then(() => {
+      //     win.webContents.executeJavaScript(content.toString());
+      //     win.webContents.executeJavaScript(
+      //       `sessionStorage.setItem('privateKey', '${currentSession.privateKey}');`,
+      //     );
+      //     console.warn('webContents -- ', win.webContents);
+      //   });
+      // });
     },
   );
 
